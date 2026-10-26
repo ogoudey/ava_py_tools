@@ -43,7 +43,7 @@ def _safe_request(method: str, endpoint: str, params: Optional[Dict[str, Any]] =
 class AvaBaseAPI:
     """Ava Base HTTP API"""
 
-
+    
     def drive_velocity(self,
                    translate: float = 0.0,
                    rotate: float = 0.0,
@@ -78,6 +78,7 @@ class AvaBaseAPI:
         }
         return _safe_request("GET", "/robot/drive/position", params)
 
+
     # mapping -> localization mode 
     def localize(self, mapId: int = 1):
         params = {"mapId": mapId}
@@ -100,7 +101,7 @@ class AvaBaseAPI:
             params["orientFirst"] = str(orient_first).lower()
         return _safe_request("POST", "/robot/drive/destination", params)
 
-    ########## Driving ############33
+    ########## Driving ############
     def drive_local_waypoint(self, x: float, y: float, theta: Optional[float] = None) -> Dict[str, Any]:
         params = {"x": x, "y": y}
         if theta is not None:
@@ -109,10 +110,6 @@ class AvaBaseAPI:
 
     def drive_updates(self) -> Dict[str, Any]:
         return _safe_request("GET", "/robot/drive/updates")
-
-
-    
-
     
     ######## -------- Docking --------- ##########
 
@@ -148,6 +145,7 @@ class AvaBaseAPI:
             "x": float(data["x"]) + d * math.cos(float(data["theta"])),
             "y": float(data["y"]) + d * math.sin(float(data["theta"])),
         }
+    
     ######### ---------- DB Stuff -------- ########33
     def import_db(self, path_to_db, new_db_name):
         with open(path_to_db) as f:
@@ -197,7 +195,7 @@ class AvaBaseAPI:
     def delete_map(self, mapId: int):
         return _safe_request("GET", f"/robot/mapping/deleteMap/{mapId}")
     
-    #############3 Tagging ############
+    ############# Tagging ############
     def assign_dock_attribute_to_tag(self, tagId):
         """
         Doesn't work
@@ -226,6 +224,7 @@ class AvaBaseAPI:
         return _safe_request("GET", f"/robot/annotation/deleteTag/{mapId}/{tagId}")
 
     def drive_to_tag(self, mapId: int, tagId: int) -> Dict[str, Any]:
+        print(f"[ava_base] Sending /robot/drive/driveToTag/{mapId}/{tagId}")
         return _safe_request("POST", f"/robot/drive/driveToTag/{mapId}/{tagId}")
 
     def get_perception(self):
@@ -256,9 +255,6 @@ class AvaBaseAPI:
                 time.sleep(1)
             print(f"Retrying dock {time.time() - t0}")
 
-
-    def pp(self, func_result):
-        print(json.dumps(func_result, indent=2))
 
 ava = AvaBaseAPI()
 
