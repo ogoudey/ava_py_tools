@@ -5,7 +5,7 @@ from feedback import AvaFeedback
 
 
 class AvaPolicyController:
-    teleop: Optional[AvaPolicy]
+    policy: Optional[AvaPolicy]
     feedback: Optional[AvaFeedback]
     def __init__(self, policy: Optional[AvaPolicy], feedback: Optional[AvaFeedback]):
         self.policy = policy
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     a = AvaTeleopPolicy()
     f = AvaFeedback()
     c = AvaPolicyController(
-        teleop=a,
+        policy=a,
         feedback=f
     )
     c.test_loop()
