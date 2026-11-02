@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ava teleop</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-armed="false">
+  <header class="bar">
+    <h1 class="brand">Ava teleop</h1>
+    <ul class="links" aria-label="Connections">
+      <li class="link" id="link-controller" data-ok="unknown"><i aria-hidden="true"></i>Controller</li>
+      <li class="link" id="link-camera" data-ok="unknown"><i aria-hidden="true"></i>Camera</li>
+      <li class="link" id="link-feedback" data-ok="unknown"><i aria-hidden="true"></i>Feedback</li>
+    </ul>
+    <button id="arm" class="arm" type="button">
+      <span class="arm-label">Take control</span><kbd>Enter</kbd>
+    </button>
+  </header>
+
+  <main class="layout">
+    <section class="cams" id="cams" aria-label="Onboard cameras"></section>
+
+    <aside class="side">
+      <section class="panel">
+        <h2>Keys</h2>
+        <div id="keys" class="keys"></div>
+        <p class="hint" id="key-hint"></p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Bindings</h2>
+          <span class="meta" id="sync-summary"></span>
+          <button id="resync" class="small" type="button">Check again</button>
+        </div>
+        <table class="table" id="sync"></table>
+      </section>
+    </aside>
+
+    <section class="panel tape-panel">
+      <div class="panel-head">
+        <h2>Events</h2>
+        <span class="meta" id="tape-meta"></span>
+      </div>
+      <div class="tape-wrap">
+        <table class="table tape">
+          <thead>
+            <tr><th>Seq</th><th>Time</th><th>Key</th><th>Edge</th><th>Action</th><th>Result</th><th class="num">ms</th></tr>
+          </thead>
+          <tbody id="tape"></tbody>
+        </table>
+        <p class="empty" id="tape-empty">No events yet. Take control, then press a key.</p>
+      </div>
+    </section>
+
+    <section class="panel fb-panel">
+      <div class="panel-head">
+        <h2>Feedback</h2>
+        <span class="meta" id="fb-meta"></span>
+      </div>
+      <dl class="fb" id="fb"></dl>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

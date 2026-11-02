@@ -4,11 +4,12 @@ from flask import request, jsonify, Flask
 from pynput import keyboard
 import threading
 import time
-import ava_base as ab
 from typing import List
 import syncing
 
-ava = ab.AvaBaseAPI()
+import ava_base as ab
+
+ava = None
 
 class Policy:
     #input_mapping: dict[syncing.Modality, dict[str, syncing.ModalityUnit]]
@@ -32,10 +33,11 @@ class AvaTeleopPolicy(AvaPolicy):
             "e": "rotate_cw"
         }
     }
-    def __init__(self, host="0.0.0.0", port=5000):
+    def __init__(self, base: ab.AvaBaseAPI, host="0.0.0.0", port=5000):
         self.app = Flask(__name__)
         self.host = host
         self.port = port
+        self.base = base
 
         self.speed = 0.1
         self.lateral_speed = 0.1
@@ -46,13 +48,14 @@ class AvaTeleopPolicy(AvaPolicy):
             "rotate": 0.0
         }
         self.running = True
-        self.app = Flask(__name__)
         self._register_routes()
+        self.base = None
 
-    def run(self):
+    def start(self):
         """Starts the Flask server and the command runner."""
         threading.Thread(target=self.command_runner, daemon=True).start()
-        self.app.run(host=self.host, port=self.port, debug=True)
+        print(f"[Policy] Starting Flask server... on {self.port}")
+        self.app.run(host=self.host, port=self.port, debug=True, use_reloader=False)
 
     def _register_routes(self):
         """Maps endpoints to instance methods."""
@@ -125,7 +128,7 @@ class AvaTeleopPolicy(AvaPolicy):
             try:
                 # Only send command if any component is non-zero
                 if any(abs(v) > 1e-6 for v in self.current_cmd.values()):
-                    x = ava.drive_velocity(
+                    x = self.base.drive_velocity(
                         translate=self.current_cmd.get("translate", 0.0),
                         sidestep=self.current_cmd.get("sidestep", 0.0),
                         rotate=self.current_cmd.get("rotate", 0.0),

@@ -237,7 +237,30 @@ class AvaBaseAPI:
         except Exception as e:
             print(f"[get_perception] Failed: {e}")
             return None
-        
+
+    def get_camera_frame(self, camera="top", param="10"):
+        """One JPEG from robot/streaming/camera/<camera>/<param>/<ts> as raw bytes, or None."""
+        url = f"{BASE_URL}/robot/streaming/camera/{camera}/{param}/{int(time.time() * 1000)}"
+        try:
+            with requests.get(url, timeout=TIMEOUT, stream=True) as r:
+                r.raise_for_status()
+                if "multipart" not in r.headers.get("Content-Type", "").lower():
+                    return r.content
+                # MJPEG stream: read up to the first complete JPEG, then hang up
+                buf = b""
+                for chunk in r.iter_content(16384):
+                    buf += chunk
+                    start = buf.find(b"\xff\xd8")
+                    end = buf.find(b"\xff\xd9", start + 2) if start >= 0 else -1
+                    if end >= 0:
+                        return buf[start:end + 2]
+                    if len(buf) > 8_000_000:
+                        raise ValueError("no complete JPEG in the first 8 MB of the stream")
+                raise ValueError("stream ended before a complete JPEG")
+        except Exception as e:
+            print(f"[get_camera_frame] Failed: {e}")
+            return None
+
     # Composite functions
 
     ## Not actually smart

@@ -1,52 +1,71 @@
 import requests
-import syncing
+
 
 class Interface:
-    action_mapping: dict[str, dict[str, str]]
-    controller_server: str
+    """Base class for all teleop interfaces.
 
-    def sync(self):
-        # check /sync endpoint of controller server
+    `action_mapping` is the explicit contract: {modality: {input: robot_action}}.
+    `sync()` checks that contract against the controller's /sync endpoint.
+    """
+
+    action_mapping: dict[str, dict[str, str]]
+    policy_server: str
+
+    def sync_report(self) -> dict:
+        """Compare the local action mapping with the controller's, one record per binding.
+
+        Returns {"reachable": bool, "error": str | None, "bindings": [...]}, where each
+        binding is {"modality", "input", "expected", "actual", "status"} and status is
+        one of "match", "mismatch", "missing_input", "missing_modality".
+        """
         try:
-            # Assuming an endpoint URL is defined, e.g., self.server_url
-            response = requests.get(f"{self.controller_server}/sync", timeout=5)
+            response = requests.get(f"{self.policy_server}/sync", timeout=5)
             response.raise_for_status()
             server_data = response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error communicating with the controller server: {e}")
-            return
+            return {"reachable": False, "error": f"Error communicating with the controller server: {e}", "bindings": []}
         except ValueError:
-            print("Error: Server response was not valid JSON.")
-            return
+            return {"reachable": False, "error": "Server response was not valid JSON.", "bindings": []}
 
-        # Iterate through local action mapping and compare with server data
-        for modality, action in self.action_mapping.items():
-            modality_name = modality
-            print(f"Syncing modality: {modality_name}")
-            
-            # Check if the modality exists in the server response
-            if modality_name not in server_data:
-                print(f"  [MISMATCH] Modality '{modality_name}' is missing from the server response.")
-                continue
-                
-            server_actions = server_data[modality_name]
-
+        bindings = []
+        for modality_name, action in self.action_mapping.items():
+            server_actions = server_data.get(modality_name)
             for input_key, expected_unit in action.items():
-                # Convert keys/values to strings for comparison as requested
-                input_str = str(input_key)
-                expected_str = str(expected_unit)
-                
-                # Check if the input exists in the server's action dict for this modality
-                if input_str not in server_actions:
-                    print(f"  [MISMATCH] Input '{input_str}' under '{modality_name}' is missing on the server.")
-                    continue
-                    
-                actual_str = str(server_actions[input_str])
-
-                # Compare the strings
-                if actual_str != expected_str:
-                    print(f"  [MISMATCH] For input '{input_str}' in '{modality_name}':")
-                    print(f"    Expected: {expected_str}")
-                    print(f"    Got     : {actual_str}")
+                # Keys/values compared as strings, as before
+                input_str, expected_str = str(input_key), str(expected_unit)
+                record = {"modality": modality_name, "input": input_str, "expected": expected_str, "actual": None}
+                if server_actions is None:
+                    record["status"] = "missing_modality"
+                elif input_str not in server_actions:
+                    record["status"] = "missing_input"
                 else:
-                    print(f"  [MATCH] Input '{input_str}' is synchronized.")
+                    record["actual"] = str(server_actions[input_str])
+                    record["status"] = "match" if record["actual"] == expected_str else "mismatch"
+                bindings.append(record)
+        return {"reachable": True, "error": None, "bindings": bindings}
+
+    def sync(self) -> dict:
+        """Print the sync report (same messages as before) and return it."""
+        report = self.sync_report()
+        if not report["reachable"]:
+            print(f"Error: {report['error']}")
+            return report
+
+        current = None
+        for b in report["bindings"]:
+            if b["modality"] != current:
+                current = b["modality"]
+                print(f"Syncing modality: {current}")
+                if b["status"] == "missing_modality":
+                    print(f"  [MISMATCH] Modality '{current}' is missing from the server response.")
+            if b["status"] == "missing_modality":
+                continue
+            if b["status"] == "missing_input":
+                print(f"  [MISMATCH] Input '{b['input']}' under '{current}' is missing on the server.")
+            elif b["status"] == "mismatch":
+                print(f"  [MISMATCH] For input '{b['input']}' in '{current}':")
+                print(f"    Expected: {b['expected']}")
+                print(f"    Got     : {b['actual']}")
+            else:
+                print(f"  [MATCH] Input '{b['input']}' is synchronized.")
+        return report
