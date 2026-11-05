@@ -197,63 +197,17 @@ def create_app(gui: AvaTeleopGUI) -> Flask:
     def feedback():
         return jsonify(gui.fetch_feedback())
 
-    @app.get("/api/camera/<cam>/probe")
-    def camera_probe(cam):
-        """Tells the page whether the camera route returns single frames or an MJPEG stream."""
+    @app.get("/api/camera/<cam>/latest")
+    def camera_latest(cam):
+        """Relays the feedback service's newest frame; 204 when nothing newer than ?after=N."""
         try:
-            with requests.get(gui.camera_url(cam), stream=True, timeout=(1, 2)) as r:
-                ctype = r.headers.get("Content-Type", "")
-                mode = "stream" if "multipart" in ctype.lower() else "snapshot"
-                return jsonify(ok=r.ok, http=r.status_code, content_type=ctype, mode=mode)
+            r = gui._session().get(f"{gui.feedback_server}/camera/{cam}/latest",
+                                   params={"after": request.args.get("after", 0)}, timeout=1)
         except requests.exceptions.RequestException as e:
-            return jsonify(ok=False, error=type(e).__name__, mode="snapshot")
-
-    @app.get("/robot/streaming/<path:rest>")
-    def camera_proxy(rest):
-        """Same relative route as the native robot UI, passed through to the robot API."""
-        url = f"{gui.robot_api}/robot/streaming/{rest}"
-        if request.query_string:
-            url += "?" + request.query_string.decode()
-        try:
-            upstream = requests.get(url, stream=True, timeout=(1, 5))
-        except requests.exceptions.RequestException as e:
-            return Response(f"camera unreachable: {type(e).__name__}", status=502, mimetype="text/plain")
-
-        def relay():
-            try:
-                yield from upstream.iter_content(chunk_size=16384)
-            finally:
-                upstream.close()
-
-        return Response(
-            stream_with_context(relay()),
-            status=upstream.status_code,
-            content_type=upstream.headers.get("Content-Type", "application/octet-stream"),
-            headers={"Cache-Control": "no-store"},
-        )
+            return Response(f"feedback service unreachable: {type(e).__name__}", status=502, mimetype="text/plain")
+        headers = {k: r.headers[k] for k in ("X-Frame-Seq", "X-Frame-Age-Ms") if k in r.headers}
+        headers["Cache-Control"] = "no-store"
+        return Response(r.content, status=r.status_code,
+                        content_type=r.headers.get("Content-Type", "application/octet-stream"), headers=headers)
 
     return app
-
-
-def main():
-    p = argparse.ArgumentParser(description="Browser teleop for the Ava mobile base")
-    p.add_argument("--controller", default="http://localhost:5000", help="controller server URL")
-    p.add_argument("--robot-api", default=None, help="host serving robot/streaming/... (defaults to --controller)")
-    p.add_argument("--camera", action="append", dest="cameras", help="camera name, repeatable (default: top)")
-    p.add_argument("--camera-param", default="10", help="the segment after the camera name in the stream route")
-    p.add_argument("--host", default="127.0.0.1")
-    p.add_argument("--port", type=int, default=8080)
-    args = p.parse_args()
-
-    gui = AvaTeleopGUI(args.controller, robot_api=args.robot_api,
-                       cameras=args.cameras, camera_param=args.camera_param)
-    report = gui.sync()
-    if report["reachable"] and any(b["status"] != "match" for b in report["bindings"]):
-        print("GUI and policy actions do not sync! See the Bindings panel.")
-
-    print(f"Teleop page: http://{args.host}:{args.port}")
-    create_app(gui).run(host=args.host, port=args.port, threaded=True)
-
-
-if __name__ == "__main__":
-    main()

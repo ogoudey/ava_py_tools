@@ -16,15 +16,14 @@ TIMEOUT = 5.0  # seconds
 # =========================
 # Helper function
 # =========================
-def _safe_request(method: str, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Send a HTTP request safely.
-    Returns JSON if possible, otherwise a dict describing the error.
-    """
+def _safe_request(method: str, endpoint: str,
+                  params: Optional[Dict[str, Any]] = None,
+                  json_body: Optional[Any] = None) -> Dict[str, Any]:
     url = BASE_URL.rstrip("/") + endpoint
     try:
-        print(f"Params: {params}")
-        resp = requests.request(method, url, params=params, timeout=TIMEOUT)
+
+        resp = requests.request(method, url, params=params, json=json_body, timeout=TIMEOUT)
+
         try:
             data = resp.json()
         except ValueError:
@@ -85,8 +84,9 @@ curl 'http://172.18.0.1/robot/drive/velocity' \
             "odoaEnabled": True,
             "nudge": nudge
         }
-        print(f"\n\n{payload}\n\n")
-        return _safe_request("POST", "/robot/drive/velocity", payload)  
+
+        return _safe_request("POST", "/robot/drive/velocity", json_body=payload)
+
 
     def stop_robot(self) -> Dict[str, Any]:
         return _safe_request("POST", "/robot/drive/stopRobot")

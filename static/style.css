@@ -116,7 +116,9 @@ body[data-armed="true"] { box-shadow: inset 0 0 0 3px var(--held); }
   place-items: center;
   overflow: hidden;
 }
-.frame canvas, .frame img { max-width: 100%; max-height: 100%; display: block; image-rendering: auto; }
+/* Taken out of layout entirely, so the frame's size never depends on the image size */
+.frame { position: relative; }
+.frame canvas, .frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
 .cam-wait { color: var(--dim); margin: 0; }
 .cam figcaption { display: flex; gap: 18px; font-size: 14px; color: var(--dim); }
 .cam-name { color: var(--ink); font-weight: 600; }
@@ -219,3 +221,7 @@ tr[data-status="unmapped"] { color: var(--dim); }
   .key { transition: none; }
 }
 .cam-skip { color: var(--held); }
+.zoom { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.zoom button { width: 26px; padding: 0; line-height: 22px; }
+.zoom-level { font-family: var(--mono); font-size: 13px; min-width: 3ch; text-align: center; color: var(--ink); }
+.side > .panel { flex: none; }   /* side column scrolls instead of squashing its panels */
