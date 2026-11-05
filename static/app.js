@@ -290,12 +290,38 @@ $("#resync").addEventListener("click", runSync);
 
 // ---------------- Camera ---------------- //
 
+// ---- Zoom (shared by all cameras) ----
+const ZOOM_LEVELS = [1, 1.5, 2, 3, 4];
+const zoomListeners = [];
+state.zoomIdx = 0;
+try { state.zoomIdx = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, Number(localStorage.getItem("ava.zoomIdx")) || 0)); } catch {}
+
+function setZoom(idx) {
+  idx = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, idx));
+  if (idx === state.zoomIdx) return;
+  state.zoomIdx = idx;
+  try { localStorage.setItem("ava.zoomIdx", String(idx)); } catch {}
+  zoomListeners.forEach((fn) => fn());
+}
+
+// + / - zoom whether or not control is taken; handled before the drive keys so they
+// never show up in the event log as unbound presses
+window.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
+  const step = { "+": 1, "=": 1, "-": -1, "_": -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  if (!e.repeat) setZoom(state.zoomIdx + step);
+}, true);
+
 async function startCamera(cam) {
   const fig = document.createElement("figure");
   fig.className = "cam";
   fig.innerHTML = `
     <div class="frame"><p class="cam-wait">Waiting for the first frame</p></div>
-    <figcaption><span class="cam-name"></span><span class="cam-frame"></span><span class="cam-rate"></span><span class="cam-lat"></span><span class="cam-skip"></span></figcaption>`;
+    <figcaption><span class="cam-name"></span><span class="cam-frame"></span><span class="cam-rate"></span><span class="cam-lat"></span><span class="cam-skip"></span>
+      <span class="zoom"><button type="button" class="small" data-z="-1" aria-label="Zoom out">−</button><output class="zoom-level"></output><button type="button" class="small" data-z="1" aria-label="Zoom in">+</button></span></figcaption>`;
   fig.querySelector(".cam-name").textContent = cam;
   $("#cams").append(fig);
   const wait = fig.querySelector(".cam-wait");
@@ -305,6 +331,26 @@ async function startCamera(cam) {
   canvas.setAttribute("aria-label", `${cam} camera`);
   fig.querySelector(".frame").append(canvas);
   const ctx = canvas.getContext("2d");
+
+  // Zoom crops the center of the frame; the canvas is then scaled up to fill the panel
+  let last = null;   // last ImageBitmap, kept so a zoom change redraws immediately
+  const draw = () => {
+    if (!last) return;
+    const z = ZOOM_LEVELS[state.zoomIdx];
+    const sw = last.width / z, sh = last.height / z;
+    const w = Math.round(sw), h = Math.round(sh);
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+    ctx.drawImage(last, (last.width - sw) / 2, (last.height - sh) / 2, sw, sh, 0, 0, w, h);
+  };
+  const showZoom = () => (fig.querySelector(".zoom-level").textContent = `${ZOOM_LEVELS[state.zoomIdx]}×`);
+  zoomListeners.push(() => { showZoom(); draw(); });
+  showZoom();
+  fig.querySelectorAll(".zoom button").forEach((b) =>
+    b.addEventListener("click", (e) => { setZoom(state.zoomIdx + Number(b.dataset.z)); e.currentTarget.blur(); }));
+  fig.querySelector(".frame").addEventListener("wheel", (e) => {
+    e.preventDefault();
+    setZoom(state.zoomIdx + (e.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
 
   // Frame numbers come from the feedback service. Ask only for frames newer than the
   // one on screen; frames that arrived there and were never shown here count as skipped.
@@ -321,12 +367,9 @@ async function startCamera(cam) {
         const seq = Number(r.headers.get("X-Frame-Seq"));
         const age = Number(r.headers.get("X-Frame-Age-Ms"));
         const bmp = await createImageBitmap(await r.blob());
-        if (canvas.width !== bmp.width || canvas.height !== bmp.height) {
-          canvas.width = bmp.width;
-          canvas.height = bmp.height;
-        }
-        ctx.drawImage(bmp, 0, 0);
-        bmp.close();
+        if (last) last.close();
+        last = bmp;
+        draw();
         if (shown === 0) wait.remove();
         else if (seq > shown + 1) skipped += seq - shown - 1;
         shown = seq;
