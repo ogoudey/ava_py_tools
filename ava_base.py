@@ -23,6 +23,7 @@ def _safe_request(method: str, endpoint: str, params: Optional[Dict[str, Any]] =
     """
     url = BASE_URL.rstrip("/") + endpoint
     try:
+        print(f"Params: {params}")
         resp = requests.request(method, url, params=params, timeout=TIMEOUT)
         try:
             data = resp.json()
@@ -59,13 +60,32 @@ class AvaBaseAPI:
             duration: time to execute this command
             nudge: boolean, small-step flag
         """
+        #{"translate":-0.06328129768371582,"rotate":-0.39049482345581055,"sidestep":0,"duration":0.5,"odoaEnabled":true,"nudge":false} # example from the native GUI
+        """
+curl 'http://172.18.0.1/robot/drive/velocity' \
+  -X POST \
+  -H 'User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:149.0) Gecko/20100101 Firefox/149.0' \
+  -H 'Accept: */*' \
+  -H 'Accept-Language: en-US,en;q=0.9' \
+  -H 'Accept-Encoding: gzip, deflate' \
+  -H 'Request-Time: 2238077' \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -H 'X-Requested-With: XMLHttpRequest' \
+  -H 'Origin: http://172.18.0.1' \
+  -H 'Connection: keep-alive' \
+  -H 'Referer: http://172.18.0.1/' \
+  -H 'Priority: u=0' \
+  --data-raw '{"translate":-0.06328129768371582,"rotate":-0.39049482345581055,"sidestep":0,"duration":0.2,"odoaEnabled":true,"nudge":false}'
+"""
         payload = {
-            "translate": translate,
-            "rotate": rotate,
-            "sidestep": sidestep,
+            "translate": translate/2,
+            "rotate": rotate/2,
+            "sidestep": sidestep/2,
             "duration": duration,
+            "odoaEnabled": True,
             "nudge": nudge
         }
+        print(f"\n\n{payload}\n\n")
         return _safe_request("POST", "/robot/drive/velocity", payload)  
 
     def stop_robot(self) -> Dict[str, Any]:

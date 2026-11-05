@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional
 from flask import request, jsonify, Flask
-
+import logging
+logger = logging.getLogger('werkzeug')
+logger.setLevel(logging.WARNING)
 
 import threading
 import time
@@ -43,26 +45,26 @@ class AvaTeleopPolicy(AvaPolicy):
         self.speed = 0.1
         self.lateral_speed = 0.1
         self.rot_speed = 0.1  # optional, could map QE for rotation
-        self.current_cmd = {
+        self.cmd = {
             "translate": 0.0,
             "sidestep": 0.0,
             "rotate": 0.0
         }
         self.running = True
         self._register_routes()
-        self.base = None
 
     def start(self):
         """Starts the Flask server and the command runner."""
         threading.Thread(target=self.command_runner, daemon=True).start()
-        print(f"[Policy] Starting Flask server... on {self.port}")
-        self.app.run(host=self.host, port=self.port, debug=True, use_reloader=False)
+        logger.info(f"[Policy] Starting Flask server... on {self.port}")
+        self.app.run(host=self.host, port=self.port, debug=False, use_reloader=False)
 
     def _register_routes(self):
         """Maps endpoints to instance methods."""
         self.app.add_url_rule('/health', 'health', self.health, methods=['GET'])
         self.app.add_url_rule('/sync', 'sync', self.sync, methods=['GET'])
         self.app.add_url_rule('/command', 'command', self.receive_command, methods=['POST'])
+        self.app.add_url_rule('/stop', 'stop', self.receive_stop, methods=['POST'])
 
     def health(self):
         """Health check endpoint."""
@@ -95,8 +97,8 @@ class AvaTeleopPolicy(AvaPolicy):
         elif action == "rotate_right":
             self.cmd["rotate"] = -self.rot_speed
 
-        print(f"Action '{action}' received. Updated server state: {self.cmd}")
-        return jsonify({"status": "success", "current_cmd": self.cmd}), 200
+        logger.info(f"Action '{action}' received. Updated server state: {self.cmd}")
+        return jsonify({"status": "success", "cmd": self.cmd}), 200
 
     def receive_stop(self):
         data = request.json
@@ -121,23 +123,23 @@ class AvaTeleopPolicy(AvaPolicy):
         elif action == "rotate_right":
             self.cmd["rotate"] = 0.0
 
-        print(f"Action '{action}' received. Updated server state: {self.cmd}")
-        return jsonify({"status": "success", "current_cmd": self.cmd}), 200
+        logger.info(f"Action '{action}' received. Updated server state: {self.cmd}")
+        return jsonify({"status": "success", "cmd": self.cmd}), 200
             
     def command_runner(self):
         while self.running:
             try:
                 # Only send command if any component is non-zero
-                if any(abs(v) > 1e-6 for v in self.current_cmd.values()):
+                if any(abs(v) > 1e-6 for v in self.cmd.values()):
                     x = self.base.drive_velocity(
-                        translate=self.current_cmd.get("translate", 0.0),
-                        sidestep=self.current_cmd.get("sidestep", 0.0),
-                        rotate=self.current_cmd.get("rotate", 0.0),
-                        duration=1.0,    # safe fixed duration
-                        nudge=False      # default
+                        translate=self.cmd.get("translate", 0.0),
+                        sidestep=self.cmd.get("sidestep", 0.0),
+                        rotate=self.cmd.get("rotate", 0.0),
+                        duration=0.2,    # safe fixed duration
+                        nudge=True      # default
                     )
 
-                    print(f"{self.current_cmd} => {x}", end="\r")
+                    print(f"{self.cmd} => {x}", end="\r")
             except Exception as e:
                 print("Could not reach API:", e)
             time.sleep(0.1)  # 10 Hz
