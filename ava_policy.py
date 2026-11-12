@@ -42,9 +42,9 @@ class AvaTeleopPolicy(AvaPolicy):
         self.port = port
         self.base = base
 
-        self.speed = 0.1
-        self.lateral_speed = 0.1
-        self.rot_speed = 0.1  # optional, could map QE for rotation
+        self.speed = 0.2
+        self.lateral_speed = 0.2
+        self.rot_speed = 0.2  # optional, could map QE for rotation
         self.cmd = {
             "translate": 0.0,
             "sidestep": 0.0,
