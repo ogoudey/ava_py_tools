@@ -43,9 +43,9 @@ class AvaTeleopPolicy(AvaPolicy):
         self.port = port
         self.base = base
 
-        self.speed = 0.1
-        self.lateral_speed = 0.1
-        self.rot_speed = 0.1
+        self.speed = 0.2
+        self.lateral_speed = 0.2
+        self.rot_speed = 0.2
         # Cap on combined translate+sidestep, so a diagonal isn't faster than straight
         self.max_linear = max(self.speed, self.lateral_speed)
 
